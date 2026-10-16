@@ -78,6 +78,7 @@ button.ghost { background: transparent; border-color: transparent; }
 button.ghost:hover { background: var(--surface-2); }
 button.icon { padding: 6px 9px; }
 .danger-text { color: var(--danger); }
+.warn-text { color: var(--warn-text); }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 input, select, textarea {

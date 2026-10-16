@@ -6,7 +6,7 @@
   <title>Timetable & Module Planner</title>
   <meta name="description" content="Weekly class timetable and degree module planner. Runs entirely in your browser.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='3' y='5' width='26' height='24' rx='5' fill='%234f6bed'/><rect x='3' y='5' width='26' height='7' rx='3' fill='%23293d9e'/><rect x='8' y='16' width='6' height='4' rx='1' fill='white'/><rect x='17' y='16' width='7' height='9' rx='1' fill='white'/></svg>">
-  <link rel="stylesheet" href="styles.css?v=3">
+  <link rel="stylesheet" href="styles.css?v=4">
 </head>
 <body>
   <header class="topbar">
@@ -127,7 +127,7 @@
       <div class="table-wrap">
         <table class="modules">
           <thead>
-            <tr><th>Code</th><th>Name</th><th>Term</th><th class="num">Credits</th><th>Status</th><th class="num">Grade</th><th class="num">Classes</th></tr>
+            <tr><th>Code</th><th>Name</th><th>Term</th><th class="num">Units</th><th>Status</th><th class="num">Grade</th><th class="num">Classes</th></tr>
           </thead>
           <tbody id="moduleRows"></tbody>
         </table>
@@ -141,9 +141,9 @@
       <h2 id="moduleDialogTitle">Add module</h2>
       <div class="grid2">
         <label>Code<input name="code" required maxlength="20" placeholder="CS2030S" list="courseCodes" autocomplete="off"></label>
-        <label>Credits<input name="credits" type="number" min="0" step="0.5" value="15"></label>
+        <label>Units<input name="credits" type="number" min="0" step="0.5" value="4"></label>
       </div>
-      <label>Name<input name="name" required maxlength="120" placeholder="Introduction to Programming"></label>
+      <label>Name<input name="name" required maxlength="120" placeholder="Programming Methodology II"></label>
       <div class="grid2">
         <label>Term<select name="term"></select></label>
         <label>Status
@@ -196,7 +196,7 @@
         <label>Start<input name="start" type="time" required step="300" value="09:00"></label>
         <label>End<input name="end" type="time" required step="300" value="10:00"></label>
       </div>
-      <label>Location<input name="location" maxlength="80" placeholder="Room 2.14"></label>
+      <label>Location<input name="location" maxlength="80" placeholder="COM1-0208"></label>
       <p class="error" id="sessionError" hidden></p>
       <div class="dialog-actions">
         <button type="button" class="ghost danger-text" id="deleteSessionBtn">Delete</button>
@@ -211,7 +211,7 @@
   <input type="file" id="importFile" accept=".json,application/json" hidden>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-  <script src="degree.js?v=3"></script>
-  <script src="app.js?v=3"></script>
+  <script src="degree.js?v=4"></script>
+  <script src="app.js?v=4"></script>
 </body>
 </html>

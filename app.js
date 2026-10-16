@@ -19,7 +19,7 @@
 
   function sampleData() {
     const t1 = uid(), t2 = uid(), t3 = uid();
-    const m = (code, name, term, color, status = 'planned', credits = 15, grade = null) =>
+    const m = (code, name, term, color, status = 'planned', credits = 4, grade = null) =>
       ({ id: uid(), code, name, term, color, status, credits, grade, lecturer: '', notes: '' });
     const mods = [
       m('CS1101S', 'Programming Methodology', t1, COLORS[0], 'active'),
@@ -89,7 +89,8 @@
         end: s.end,
         location: String(s.location || ''),
       }));
-    const settings = { showWeekend: false, ttTerm: 'all', creditTarget: 360, theme: 'auto', view: 'timetable', ...(d.settings || {}) };
+    const settings = { showWeekend: false, ttTerm: 'all', creditTarget: 160, theme: 'auto', view: 'timetable', ...(d.settings || {}) };
+    if (settings.creditTarget === 360) settings.creditTarget = 160; // old UK-style default
     if (settings.ttTerm !== 'all' && !termIds.has(settings.ttTerm)) settings.ttTerm = terms[0]?.id || 'all';
     if (settings.addTerm !== '' && !termIds.has(settings.addTerm)) settings.addTerm = terms[0]?.id || '';
     if (!['timetable', 'planner', 'degree', 'courses', 'modules'].includes(settings.view)) settings.view = 'timetable';
@@ -271,12 +272,12 @@
     const fmt = (n) => (Number.isInteger(n) ? n : n.toFixed(1));
 
     $('#summary').innerHTML = `
-      <div class="stat"><div class="label">Completed</div><div class="value">${fmt(done)} <small>credits</small></div></div>
-      <div class="stat"><div class="label">In progress</div><div class="value">${fmt(active)} <small>credits</small></div></div>
-      <div class="stat"><div class="label">Planned</div><div class="value">${fmt(planned)} <small>credits</small></div></div>
-      <div class="stat"><div class="label">Degree target</div><div class="value"><input type="number" min="0" step="5" id="creditTarget" value="${target}" aria-label="Credit target"></div></div>
+      <div class="stat"><div class="label">Completed</div><div class="value">${fmt(done)} <small>units</small></div></div>
+      <div class="stat"><div class="label">In progress</div><div class="value">${fmt(active)} <small>units</small></div></div>
+      <div class="stat"><div class="label">Planned</div><div class="value">${fmt(planned)} <small>units</small></div></div>
+      <div class="stat"><div class="label">Degree target</div><div class="value"><input type="number" min="0" step="5" id="creditTarget" value="${target}" aria-label="Unit target"></div></div>
       <div class="stat"><div class="label">Weighted average</div><div class="value">${avg === null ? '—' : `${avg.toFixed(1)}<small>%</small>`}</div></div>
-      <div class="progress" title="${fmt(done + active + planned)} of ${target} credits accounted for">
+      <div class="progress" title="${fmt(done + active + planned)} of ${target} units accounted for">
         <span class="done" style="width:${pct(done)}%"></span>
         <span class="active" style="width:${Math.max(0, Math.min(100 - pct(done), pct(active)))}%"></span>
         <span class="planned" style="width:${Math.max(0, Math.min(100 - pct(done) - pct(active), pct(planned)))}%"></span>
@@ -286,7 +287,7 @@
   function cardHTML(m) {
     const n = state.sessions.filter((s) => s.moduleId === m.id).length;
     return `<div class="card" draggable="true" data-module="${m.id}" style="--c:${m.color}" tabindex="0">
-      <div class="row"><span class="code">${esc(m.code)}</span><span class="cr">${m.credits} cr</span></div>
+      <div class="row"><span class="code">${esc(m.code)}</span><span class="cr">${m.credits}u</span></div>
       <div class="nm">${esc(m.name)}</div>
       <div class="row"><span class="chip ${m.status}">${STATUS[m.status]}${m.grade !== null ? ` · ${m.grade}%` : ''}</span><span class="cr">${n ? `${n} class${n === 1 ? '' : 'es'}` : ''}</span></div>
     </div>`;
@@ -304,7 +305,7 @@
         <button class="ghost" data-act="rename" title="Rename">✎</button>
         <button class="ghost" data-act="delete" title="Delete term">✕</button>` : '';
       return `<div class="term" data-term="${col.id}">
-        <div class="term-head"><h3 title="${esc(col.name)}">${esc(col.name)}</h3><span class="credits">${credits} cr</span>${controls}</div>
+        <div class="term-head"><h3 title="${esc(col.name)}">${esc(col.name)}</h3><span class="credits">${credits}u</span>${controls}</div>
         <div class="cards">${mods.map(cardHTML).join('') || '<div class="drop-hint">Drop modules here</div>'}</div>
       </div>`;
     }).join('');
@@ -318,7 +319,7 @@
     $('#moduleRows').innerHTML = rows.length ? rows.map((m) => `
       <tr data-module="${m.id}" tabindex="0">
         <td><span class="code-cell" style="--c:${m.color}"><span class="dot"></span>${esc(m.code)}</span></td>
-        <td class="name">${esc(m.name)}${m.lecturer ? `<div class="muted small">${esc(m.lecturer)}</div>` : ''}</td>
+        <td class="name">${esc(m.name)}${m.lecturer ? `<div class="muted small">${esc(m.lecturer)}</div>` : ''}${catalog && !lookup(m.code.trim().toUpperCase()) ? '<div class="small warn-text">⚠ Not an NUS course code</div>' : ''}</td>
         <td>${esc(termName(m.term))}</td>
         <td class="num">${m.credits}</td>
         <td><span class="chip ${m.status}">${STATUS[m.status]}</span></td>
@@ -340,7 +341,7 @@
   const cf = { q: '', show: 'all', req: '', subject: '', levels: new Set(), sems: new Set(), limit: 40, open: new Set() };
 
   function loadCatalog() {
-    fetch('data/courses.json?v=3')
+    fetch('data/courses.json?v=4')
       .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
       .then((d) => {
         catalog = d;
@@ -353,11 +354,39 @@
           c.hay = `${c.c} ${c.t} ${c.d}`.toLowerCase();
           catalogMap.set(c.c, c);
         }
+        if (migrateToNUS()) save();
         $('#courseCodes').innerHTML = d.courses.map((c) => `<option value="${c.c}">${esc(c.t)}</option>`).join('');
         renderCourseFilters();
         render();
       })
       .catch(() => { catalogError = true; render(); });
+  }
+
+  // Example modules from the first version used made-up codes. Swap them for the
+  // NUS courses they stood for, and keep every NUS course at its official units.
+  const OLD_SAMPLE = {
+    'CS101|Introduction to Programming': 'CS1101S',
+    'MA102|Discrete Mathematics': 'CS1231S',
+    'CS103|Computer Systems': 'CS2100',
+    'EC104|Principles of Economics': 'BSP1703X',
+    'CS111|Data Structures & Algorithms': 'CS2040S',
+    'MA112|Linear Algebra': 'MA1522',
+    'CS113|Databases': 'CS2102',
+    'CS201|Software Engineering': 'CS2103T',
+  };
+
+  function migrateToNUS() {
+    let changed = false;
+    for (const m of state.modules) {
+      const code = m.code.trim().toUpperCase();
+      const nus = OLD_SAMPLE[`${m.code}|${m.name}`];
+      const c = lookup(nus || code);
+      if (!c) continue;
+      if (nus) { m.code = c.c; m.name = c.t; changed = true; }
+      else if (m.code !== c.c) { m.code = c.c; changed = true; }
+      if (m.credits !== c.u) { m.credits = c.u; changed = true; }
+    }
+    return changed;
   }
 
   function myModulesByCode() {
@@ -678,7 +707,7 @@
   function openModule(id, preset = {}) {
     editingModule = id ? getModule(id) : null;
     const m = editingModule || {
-      code: '', name: '', credits: 15, status: 'planned', grade: null, lecturer: '', notes: '',
+      code: '', name: '', credits: 4, status: 'planned', grade: null, lecturer: '', notes: '',
       term: preset.term ?? (state.settings.ttTerm !== 'all' ? state.settings.ttTerm : state.terms[0]?.id ?? null),
       color: COLORS[state.modules.length % COLORS.length],
     };

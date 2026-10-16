@@ -3,7 +3,7 @@
 A small, dependency-free web app for planning your week and your degree.
 
 - **Timetable**: weekly grid of your lectures, tutorials, labs and so on. Click an empty slot to add a class, and click a class to edit it. Clashing classes are outlined and counted, today's column and the current time are highlighted, and you can print the week.
-- **Plan**: a board with one column per term. Drag modules between terms, see credits per term, track progress towards your degree's credit target, and see your credit-weighted average for completed modules.
+- **Plan**: a board with one column per term. Drag modules between terms, see units per term, track progress towards the 160-unit degree, and see your unit-weighted average for completed modules.
 - **Degree**: a requirements tracker for the NUS **BComp (Computer Science)**, AY2026/27 cohort, with a **Second Major in Management**. It shows what's taken, in progress and planned for each requirement, plus checks for the CS focus area, level-4000 units, Industry Experience and the Management level and area rules.
 - **Courses**: a NUSMods-style search across 1,371 NUS courses: every CS/IFS/CP course, undergraduate management courses (ACC, BSE, BSN, BSP, DAO, DBA, DOS, DSC, DSN, FIN, MKT, MNO), and the Common Curriculum pools (GEC, GES, GEN, ID/CD, UTW/RVX and more). You can filter by requirement, focus area, subject, level and semester. Each course shows its description, prerequisites, preclusions and workload, and you can mark it as taken, in progress or planned in one click.
 - **My modules**: a searchable table of every module on your plan with its term, credits, status, grade and number of classes.
