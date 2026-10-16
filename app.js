@@ -340,7 +340,7 @@
   const cf = { q: '', show: 'all', req: '', subject: '', levels: new Set(), sems: new Set(), limit: 40, open: new Set() };
 
   function loadCatalog() {
-    fetch('data/courses.json?v=2')
+    fetch('data/courses.json?v=3')
       .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
       .then((d) => {
         catalog = d;
@@ -513,7 +513,7 @@
         <div class="dsec-head"><h2>Unrestricted Electives</h2><span class="muted">${fmtU(E.withMgmt.completed)} / ${E.units} units taken</span></div>
         <div class="req-grid"><div class="req-card wide">
           ${bar(E.withMgmt, E.units)}
-          <p class="small muted note">Your Second Major in Management (${fmtU(ev.sections.find((s) => s.id === 'mgmt').units)} units) fills this space. The Second Major is 8 units larger than the elective space, so check with SoC how many units can be double-counted with your CS major. Courses that don't fit any requirement above also count here.</p>
+          <p class="small muted note">Your Second Major in Management (${fmtU(ev.sections.find((s) => s.id === 'mgmt').units)} units) fills this space. Courses that don't fit any requirement above count here too, but once the Second Major is complete there's no elective space left in the 160 units.</p>
           <ul class="req-list">${E.list.length ? E.list.map((c) => reqRow(c.code, c)).join('') : '<li class="req-row missing"><span class="st"></span><span class="rt muted">No extra courses yet</span></li>'}</ul>
         </div></div>
       </section>`;

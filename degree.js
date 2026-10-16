@@ -121,7 +121,7 @@ window.Degree = (() => {
       ],
     },
     {
-      id: 'mgmt', title: 'Second Major in Management', units: 48,
+      id: 'mgmt', title: 'Second Major in Management', units: 40,
       note: 'Second Major courses take the place of your Unrestricted Electives.',
       groups: [
         {
