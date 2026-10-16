@@ -22,29 +22,35 @@
     const m = (code, name, term, color, status = 'planned', credits = 15, grade = null) =>
       ({ id: uid(), code, name, term, color, status, credits, grade, lecturer: '', notes: '' });
     const mods = [
-      m('CS101', 'Introduction to Programming', t1, COLORS[0], 'active'),
-      m('MA102', 'Discrete Mathematics', t1, COLORS[1], 'active'),
-      m('CS103', 'Computer Systems', t1, COLORS[2], 'active'),
-      m('EC104', 'Principles of Economics', t1, COLORS[3], 'active'),
-      m('CS111', 'Data Structures & Algorithms', t2, COLORS[0]),
-      m('MA112', 'Linear Algebra', t2, COLORS[1]),
-      m('CS113', 'Databases', t2, COLORS[5]),
-      m('CS201', 'Software Engineering', t3, COLORS[6], 'planned', 30),
+      m('CS1101S', 'Programming Methodology', t1, COLORS[0], 'active'),
+      m('CS1231S', 'Discrete Structures', t1, COLORS[1], 'active'),
+      m('MA1521', 'Calculus for Computing', t1, COLORS[2], 'active'),
+      m('IS1108', 'Digital and AI Ethics', t1, COLORS[3], 'active'),
+      m('MNO1706X', 'Organisational Behaviour', t1, COLORS[4], 'active'),
+      m('CS2030S', 'Programming Methodology II', t2, COLORS[0]),
+      m('CS2040S', 'Data Structures and Algorithms', t2, COLORS[5]),
+      m('MA1522', 'Linear Algebra for Computing', t2, COLORS[2]),
+      m('ACC1701X', 'Accounting for Decision Makers', t2, COLORS[6]),
+      m('GEA1000', 'Quantitative Reasoning with Data', t2, COLORS[7]),
+      m('CS2100', 'Computer Organisation', t3, COLORS[8]),
+      m('CS2101', 'Effective Communication for Computing Professionals', t3, COLORS[9]),
+      m('CS2103T', 'Software Engineering', t3, COLORS[1]),
+      m('MKT1705X', 'Principles of Marketing', t3, COLORS[6]),
     ];
     const s = (mod, type, day, start, end, location) => ({ id: uid(), moduleId: mod.id, type, day, start, end, location });
-    const [a, b, c, d] = mods;
+    const [a, b, c, d, e] = mods;
     return {
       terms: [{ id: t1, name: 'Year 1 · Semester 1' }, { id: t2, name: 'Year 1 · Semester 2' }, { id: t3, name: 'Year 2 · Semester 1' }],
       modules: mods,
       sessions: [
-        s(a, 'Lecture', 0, '09:00', '11:00', 'Hall A'),
-        s(a, 'Lab', 2, '14:00', '16:00', 'Lab 3'),
-        s(b, 'Lecture', 1, '10:00', '12:00', 'Room 1.04'),
-        s(b, 'Tutorial', 3, '13:00', '14:00', 'Room 2.11'),
-        s(c, 'Lecture', 0, '13:00', '15:00', 'Hall B'),
-        s(c, 'Lab', 4, '10:00', '12:00', 'Lab 1'),
-        s(d, 'Seminar', 2, '10:00', '11:30', 'Room 3.02'),
-        s(d, 'Lecture', 3, '15:00', '17:00', 'Hall A'),
+        s(a, 'Lecture', 1, '10:00', '12:00', 'LT19'),
+        s(a, 'Lab', 3, '14:00', '16:00', 'COM1-B108'),
+        s(b, 'Lecture', 0, '14:00', '16:00', 'I3-AUD'),
+        s(b, 'Tutorial', 2, '10:00', '11:00', 'COM1-0208'),
+        s(c, 'Lecture', 0, '10:00', '12:00', 'LT27'),
+        s(c, 'Tutorial', 4, '09:00', '10:00', 'S16-0430'),
+        s(d, 'Seminar', 2, '13:00', '15:00', 'COM3-01-21'),
+        s(e, 'Seminar', 3, '09:00', '12:00', 'BIZ1-0303'),
       ],
       settings: { ttTerm: t1 },
     };
@@ -69,6 +75,7 @@
         color: /^#[0-9a-f]{6}$/i.test(m.color) ? m.color : COLORS[0],
         lecturer: String(m.lecturer || ''),
         notes: String(m.notes || ''),
+        req: typeof m.req === 'string' ? m.req : '',
       }));
     const modIds = new Set(modules.map((m) => m.id));
     const sessions = (Array.isArray(d.sessions) ? d.sessions : [])
@@ -84,6 +91,8 @@
       }));
     const settings = { showWeekend: false, ttTerm: 'all', creditTarget: 360, theme: 'auto', view: 'timetable', ...(d.settings || {}) };
     if (settings.ttTerm !== 'all' && !termIds.has(settings.ttTerm)) settings.ttTerm = terms[0]?.id || 'all';
+    if (settings.addTerm !== '' && !termIds.has(settings.addTerm)) settings.addTerm = terms[0]?.id || '';
+    if (!['timetable', 'planner', 'degree', 'courses', 'modules'].includes(settings.view)) settings.view = 'timetable';
     return { terms, modules, sessions, settings };
   }
 
@@ -319,12 +328,340 @@
       : `<tr><td colspan="7" class="muted" style="text-align:center;padding:30px">${q ? 'No matching modules.' : 'No modules yet.'}</td></tr>`;
   }
 
+  // ---------- NUS course catalogue ----------
+
+  let catalog = null;
+  let catalogError = false;
+  const catalogMap = new Map();
+  const lookup = (code) => catalogMap.get(code);
+  const RANK = { completed: 0, active: 1, planned: 2 };
+  const GROUP_TITLE = Object.fromEntries(Degree.allGroups().map((g) => [g.id, g.title]));
+  const SEM_LABEL = { S1: 'Sem 1', S2: 'Sem 2', ST1: 'ST I', ST2: 'ST II' };
+  const cf = { q: '', show: 'all', req: '', subject: '', levels: new Set(), sems: new Set(), limit: 40, open: new Set() };
+
+  function loadCatalog() {
+    fetch('data/courses.json?v=2')
+      .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then((d) => {
+        catalog = d;
+        for (const c of d.courses) {
+          c.lv = Degree.level(c.c);
+          c.px = Degree.prefix(c.c);
+          c.groups = Degree.groupsFor(c.c);
+          c.focus = Degree.focusFor(c.c);
+          c.core = c.groups.some((id) => Degree.allGroups().find((g) => g.id === id).type === 'slots');
+          c.hay = `${c.c} ${c.t} ${c.d}`.toLowerCase();
+          catalogMap.set(c.c, c);
+        }
+        $('#courseCodes').innerHTML = d.courses.map((c) => `<option value="${c.c}">${esc(c.t)}</option>`).join('');
+        renderCourseFilters();
+        render();
+      })
+      .catch(() => { catalogError = true; render(); });
+  }
+
+  function myModulesByCode() {
+    const map = new Map();
+    for (const m of state.modules) {
+      const k = m.code.trim().toUpperCase();
+      if (!k) continue;
+      const p = map.get(k);
+      if (!p || RANK[m.status] < RANK[p.status]) map.set(k, m);
+    }
+    return map;
+  }
+
+  function setCourseStatus(code, status) {
+    const existing = state.modules.filter((m) => m.code.trim().toUpperCase() === code);
+    if (status === 'remove') {
+      const ids = new Set(existing.map((m) => m.id));
+      const n = state.sessions.filter((s) => ids.has(s.moduleId)).length;
+      if (n && !confirm(`Remove ${code} and its ${n} class${n === 1 ? '' : 'es'} from your timetable?`)) return;
+      state.modules = state.modules.filter((m) => !ids.has(m.id));
+      state.sessions = state.sessions.filter((s) => !ids.has(s.moduleId));
+      toast(`${code} removed from your plan`);
+    } else if (existing.length) {
+      existing.forEach((m) => { m.status = status; });
+      toast(`${code}: ${STATUS[status]}`);
+    } else {
+      const c = lookup(code);
+      const term = state.settings.addTerm || null;
+      state.modules.push({
+        id: uid(), code, name: c ? c.t : code, credits: c ? c.u : 4, term, status, grade: null,
+        color: COLORS[state.modules.length % COLORS.length], lecturer: '', notes: '', req: '',
+      });
+      toast(`${code} added to ${termName(term)} as ${STATUS[status].toLowerCase()}`);
+    }
+    commit();
+  }
+
+  function showCourse(code) {
+    Object.assign(cf, { q: code, show: 'all', req: '', subject: '', limit: 40 });
+    cf.levels.clear();
+    cf.sems.clear();
+    cf.open.add(code);
+    syncCourseFilters();
+    setView('courses');
+    renderCourses();
+    window.scrollTo(0, 0);
+  }
+
+  function browseGroup(req) {
+    Object.assign(cf, { q: '', show: 'all', req, subject: '', limit: 40 });
+    cf.levels.clear();
+    cf.sems.clear();
+    syncCourseFilters();
+    setView('courses');
+    renderCourses();
+    window.scrollTo(0, 0);
+  }
+
+  // ---------- Degree view ----------
+
+  const ICON = { completed: '✓', active: '◐', planned: '○', missing: '' };
+  const ST_LABEL = { completed: 'Taken', active: 'In progress', planned: 'Planned', missing: 'Not on your plan yet' };
+  const fmtU = (n) => (Number.isInteger(n) ? n : n.toFixed(1));
+
+  function bar(got, of) {
+    const p = (v) => (of ? Math.min(100, (v / of) * 100) : 0);
+    const a = p(got.completed), b = Math.min(100 - a, p(got.active)), c = Math.min(100 - a - b, p(got.planned));
+    return `<div class="progress"><span class="done" style="width:${a}%"></span><span class="active" style="width:${b}%"></span><span class="planned" style="width:${c}%"></span></div>`;
+  }
+
+  function reqRow(code, c, { add = true } = {}) {
+    const info = lookup(code);
+    const st = c ? c.status : 'missing';
+    const title = (c && c.title) || (info && info.t) || '';
+    const units = c ? c.units : info ? info.u : '';
+    return `<li class="req-row ${st}">
+      <span class="st" title="${ST_LABEL[st]}">${ICON[st]}</span>
+      <button class="link rc" data-show="${esc(code)}">${esc(code)}</button>
+      <span class="rt">${esc(title)}</span>
+      ${!c && add ? `<button class="mini" data-add="${esc(code)}" title="Add to your plan as planned">+ Plan</button>` : ''}
+      <span class="ru">${units === '' ? '' : `${units}u`}</span>
+    </li>`;
+  }
+
+  function groupCard(r) {
+    const g = r.group;
+    let rows = '';
+    if (g.type === 'slots') {
+      const filled = r.slots.filter((s) => s.course).length;
+      for (const s of r.slots) {
+        if (s.course) rows += reqRow(s.course.code, s.course);
+        else if (g.choose && filled >= g.choose) continue;
+        else if (s.codes.length === 1) rows += reqRow(s.codes[0], null);
+        else {
+          rows += `<li class="req-row missing"><span class="st"></span><span class="rt">${s.label ? `${esc(s.label)}: ` : ''}${s.codes.map((c) => `<button class="link" data-show="${c}">${c}</button>`).join(' / ')}</span></li>`;
+        }
+      }
+    } else {
+      rows = r.list.map((c) => reqRow(c.code, c)).join('');
+      const left = g.units - (r.units.completed + r.units.active + r.units.planned);
+      if (left > 0) rows += `<li class="req-row missing"><span class="st"></span><span class="rt muted">${fmtU(left)} more units · ${esc(g.hint || '')}</span></li>`;
+    }
+    const checks = r.checks.length
+      ? `<ul class="req-checks">${r.checks.map((ch) => `<li class="${ch.state}"><span class="st">${ch.state === 'done' ? '✓' : ch.state === 'planned' ? '○' : '✕'}</span>${esc(ch.label)}</li>`).join('')}</ul>`
+      : '';
+    const pill = r.complete ? '<span class="chip completed">Complete</span>' : r.onTrack ? '<span class="chip active">On track</span>' : '<span class="chip">To do</span>';
+    const p = r.progress;
+    const got = g.type === 'slots'
+      ? { completed: p.done, active: 0, planned: p.any - p.done }
+      : r.units;
+    let focus = '';
+    if (g.id === 'bd') {
+      const ev = lastEval;
+      focus = `<details class="focus"${focusOpen ? ' open' : ''}><summary>Focus areas (pick one: 3 primaries, at least one at level 4000)</summary>
+        <div class="focus-grid">${ev.focus.map((f) => `
+          <div class="focus-area"><div class="fa-head"><span>${esc(f.area)}</span><span class="muted small">${f.primaries.filter((x) => x.course).length}/3</span></div>
+          <div class="fa-codes">${f.primaries.map((x) => `<button class="fa-code ${x.course ? x.course.status : ''}" data-show="${x.code}" title="${esc((lookup(x.code) || {}).t || '')}">${x.code}</button>`).join('')}</div>
+          <button class="link small" data-browse="focus:${esc(f.area)}">Browse →</button></div>`).join('')}
+        </div></details>`;
+    }
+    return `<div class="req-card${r.complete ? ' is-complete' : ''}">
+      <div class="req-head"><h3>${esc(g.title)}</h3>${pill}</div>
+      <div class="req-sub muted small">${fmtU(p.done)} / ${fmtU(p.of)} ${p.unit === 'courses' && p.of === 1 ? 'course' : p.unit} done${p.any > p.done ? ` · ${fmtU(p.any - p.done)} planned` : ''}</div>
+      ${bar(got, p.of)}
+      ${g.note ? `<p class="small muted note">${esc(g.note)}</p>` : ''}
+      <ul class="req-list">${rows}</ul>
+      ${checks}
+      ${focus}
+      <button class="link small browse" data-browse="${g.id}">Browse eligible courses →</button>
+    </div>`;
+  }
+
+  let lastEval = null;
+  let focusOpen = false;
+
+  function renderDegree() {
+    const ev = Degree.evaluate(state.modules, lookup);
+    lastEval = ev;
+    const t = ev.total;
+    const E = ev.electives;
+    const sectionsHTML = ev.sections.map((s) => `
+      <section class="dsec">
+        <div class="dsec-head">
+          <h2>${esc(s.title)}</h2>
+          <span class="muted">${fmtU(s.got.completed)} / ${s.units} units taken${s.got.active + s.got.planned ? ` · ${fmtU(s.got.active + s.got.planned)} in progress or planned` : ''}</span>
+        </div>
+        ${s.note ? `<p class="muted small note">${esc(s.note)}</p>` : ''}
+        <div class="req-grid">${s.groups.map(groupCard).join('')}</div>
+      </section>`).join('');
+
+    const ue = `
+      <section class="dsec">
+        <div class="dsec-head"><h2>Unrestricted Electives</h2><span class="muted">${fmtU(E.withMgmt.completed)} / ${E.units} units taken</span></div>
+        <div class="req-grid"><div class="req-card wide">
+          ${bar(E.withMgmt, E.units)}
+          <p class="small muted note">Your Second Major in Management (${fmtU(ev.sections.find((s) => s.id === 'mgmt').units)} units) fills this space. The Second Major is 8 units larger than the elective space, so check with SoC how many units can be double-counted with your CS major. Courses that don't fit any requirement above also count here.</p>
+          <ul class="req-list">${E.list.length ? E.list.map((c) => reqRow(c.code, c)).join('') : '<li class="req-row missing"><span class="st"></span><span class="rt muted">No extra courses yet</span></li>'}</ul>
+        </div></div>
+      </section>`;
+
+    $('#degree').innerHTML = `
+      <div class="degree-head">
+        <div>
+          <h1>BComp (Computer Science) <span class="muted">+ Second Major in Management</span></h1>
+          <p class="muted small">Requirements for the AY2026/27 cohort${catalog ? ` · course data from NUSMods, ${esc(catalog.ay)}` : ''}. Mark courses as taken or planned in the <button class="link" data-view-link="courses">Courses</button> tab.</p>
+        </div>
+        <div class="degree-total">
+          <div class="big">${fmtU(t.completed)}<small> / ${ev.totalUnits} units</small></div>
+          <div class="muted small">${fmtU(t.active)} in progress · ${fmtU(t.planned)} planned</div>
+        </div>
+        ${bar(t, ev.totalUnits)}
+        <div class="legend-row small muted"><span><i class="lg done"></i>Taken</span><span><i class="lg active"></i>In progress</span><span><i class="lg planned"></i>Planned</span></div>
+      </div>
+      ${sectionsHTML}
+      ${ue}
+      <p class="disclaimer small muted">This tracker is a guide, not an official audit. Rules come from the
+        <a href="https://www.comp.nus.edu.sg/cug/per-cohort/cs/cs-26-27/" target="_blank" rel="noopener">SoC CS cohort 2026/27 page</a>,
+        <a href="https://www.comp.nus.edu.sg/programmes/ug/focus/" target="_blank" rel="noopener">CS focus areas</a> and the
+        <a href="https://bba.nus.edu.sg/second-major-minors-for-non-bba-students/" target="_blank" rel="noopener">NUS BBA second major page</a>.
+        The management "areas" are grouped by subject code because the official area list couldn't be retrieved.
+        Always check your degree audit on EduRec and confirm with your faculty.</p>`;
+  }
+
+  // ---------- Courses view ----------
+
+  function renderCourseFilters() {
+    const groups = Degree.sections.map((s) => `<optgroup label="${esc(s.title)}">${s.groups.map((g) => `<option value="${g.id}">${esc(g.title)}</option>`).join('')}</optgroup>`).join('');
+    const focus = `<optgroup label="CS focus areas">${Object.keys(Degree.FOCUS).map((a) => `<option value="focus:${esc(a)}">${esc(a)}</option>`).join('')}</optgroup>`;
+    $('#cReq').innerHTML = `<option value="">Any requirement</option>${groups}${focus}`;
+    const counts = {};
+    (catalog ? catalog.courses : []).forEach((c) => { counts[c.px] = (counts[c.px] || 0) + 1; });
+    $('#cSubject').innerHTML = '<option value="">All subjects</option>' + Object.keys(counts).sort().map((p) => `<option value="${p}">${p} (${counts[p]})</option>`).join('');
+    syncCourseFilters();
+  }
+
+  function syncCourseFilters() {
+    $('#cSearch').value = cf.q;
+    $('#cReq').value = cf.req;
+    $('#cSubject').value = cf.subject;
+    $$('#cShow button').forEach((b) => b.classList.toggle('on', b.dataset.v === cf.show));
+    $$('#cLevel input').forEach((i) => { i.checked = cf.levels.has(+i.value); });
+    $$('#cSem input').forEach((i) => { i.checked = cf.sems.has(i.value); });
+  }
+
+  function renderCourses() {
+    const sel = $('#cTerm');
+    sel.innerHTML = state.terms.map((t) => `<option value="${t.id}">${esc(t.name)}</option>`).join('') + '<option value="">Unassigned</option>';
+    sel.value = state.settings.addTerm || '';
+
+    const out = $('#cResults');
+    if (!catalog) {
+      out.innerHTML = `<div class="empty">${catalogError
+        ? 'Couldn’t load the NUS course data. If you opened <code>index.html</code> straight from your computer, serve the folder with a local web server instead (see the README).'
+        : 'Loading NUS courses…'}</div>`;
+      $('#cCount').textContent = '';
+      $('#cMore').hidden = true;
+      return;
+    }
+
+    const mine = myModulesByCode();
+    const ev = lastEval || Degree.evaluate(state.modules, lookup);
+    const needed = new Set();
+    ev.sections.forEach((s) => s.groups.forEach((r) => {
+      if (r.slots && !(r.group.choose && r.slots.filter((x) => x.course).length >= r.group.choose)) {
+        r.slots.filter((x) => !x.course).forEach((x) => x.codes.forEach((c) => needed.add(c)));
+      }
+    }));
+
+    const words = cf.q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const q = cf.q.trim().toUpperCase();
+    let list = catalog.courses.filter((c) => {
+      if (words.length && !words.every((w) => c.hay.includes(w))) return false;
+      if (cf.subject && c.px !== cf.subject) return false;
+      if (cf.levels.size && !cf.levels.has(Math.min(c.lv, 5000))) return false;
+      if (cf.sems.size && !c.s.some((s) => cf.sems.has(s))) return false;
+      if (cf.req) {
+        if (cf.req.startsWith('focus:')) { if (!c.focus.includes(cf.req.slice(6))) return false; }
+        else if (!c.groups.includes(cf.req)) return false;
+      }
+      const m = mine.get(c.c);
+      if (cf.show === 'degree') return c.core || c.focus.length > 0;
+      if (cf.show === 'todo') return needed.has(c.c) && !m;
+      if (cf.show === 'mine') return !!m;
+      if (cf.show === 'completed') return m && m.status === 'completed';
+      return true;
+    });
+    if (q) {
+      const rank = (c) => (c.c === q ? 0 : c.c.startsWith(q) ? 1 : c.t.toUpperCase().includes(q) ? 2 : 3);
+      list = list.sort((a, b) => rank(a) - rank(b) || a.c.localeCompare(b.c));
+    }
+
+    $('#cCount').textContent = `${list.length.toLocaleString()} course${list.length === 1 ? '' : 's'} · NUSMods ${catalog.ay}`;
+    const shown = list.slice(0, cf.limit);
+    out.innerHTML = shown.length ? shown.map((c) => courseCard(c, mine.get(c.c))).join('') : '<div class="empty">No courses match these filters.</div>';
+    const more = $('#cMore');
+    more.hidden = list.length <= cf.limit;
+    more.textContent = `Show more (${(list.length - cf.limit).toLocaleString()} left)`;
+  }
+
+  function courseCard(c, m) {
+    const open = cf.open.has(c.c);
+    const tags = [
+      ...c.groups.map((id) => `<button class="tag" data-browse="${id}">${esc(GROUP_TITLE[id])}</button>`),
+      ...c.focus.map((a) => `<button class="tag focus" data-browse="focus:${esc(a)}">Focus: ${esc(a)}</button>`),
+    ].join('');
+    const w = c.w && c.w.length === 5 && c.w.some((x) => x > 0) ? c.w : null;
+    const details = open ? `<dl class="cdetails">
+      ${c.pr ? `<dt>Prerequisite</dt><dd>${esc(c.pr)}</dd>` : ''}
+      ${c.pc ? `<dt>Preclusion</dt><dd>${esc(c.pc)}</dd>` : ''}
+      ${c.co ? `<dt>Corequisite</dt><dd>${esc(c.co)}</dd>` : ''}
+      ${w ? `<dt>Workload</dt><dd>${w.reduce((a, b) => a + b, 0)} hrs/week: ${w[0]} lecture · ${w[1]} tutorial · ${w[2]} lab · ${w[3]} project · ${w[4]} prep</dd>` : ''}
+      <dt>Grading</dt><dd>${esc(c.g || '—')}${c.su ? ' · S/U option available' : ''}</dd>
+      <dt>Faculty</dt><dd>${esc(c.f)}${c.dp ? ` · ${esc(c.dp)}` : ''}</dd>
+    </dl>
+    <a class="small" href="https://nusmods.com/courses/${encodeURIComponent(c.c)}" target="_blank" rel="noopener">View on NUSMods ↗</a>` : '';
+    const btn = (st, label) => `<button class="${m && m.status === st ? 'on ' + st : ''}" data-set="${st}">${label}</button>`;
+    return `<article class="course${open ? ' open' : ''}${m ? ' mine ' + m.status : ''}" data-code="${c.c}">
+      <div class="course-top">
+        <div class="ctitle">
+          <h3><span class="ccode">${c.c}</span> ${esc(c.t)}</h3>
+          <div class="cmeta">${esc(c.dp || c.f)} · ${c.u} units${c.s.length ? ' · ' + c.s.map((s) => `<span class="sem">${SEM_LABEL[s]}</span>`).join('') : ' · <span class="muted">Not offered this year</span>'}</div>
+        </div>
+        ${m ? `<span class="chip ${m.status}">${STATUS[m.status]}${m.term ? ` · ${esc(termName(m.term))}` : ''}</span>` : ''}
+      </div>
+      ${tags ? `<div class="tags">${tags}</div>` : ''}
+      <p class="cdesc">${esc(c.d) || '<span class="muted">No description.</span>'}</p>
+      ${details}
+      <div class="cactions">
+        ${btn('completed', '✓ Taken')}${btn('active', 'In progress')}${btn('planned', 'Planned')}
+        ${m ? '<button class="ghost danger-text" data-set="remove">Remove</button>' : ''}
+        <span class="spacer"></span>
+        <button class="ghost" data-toggle>${open ? 'Less' : 'More info'}</button>
+      </div>
+    </article>`;
+  }
+
   function render() {
     renderTermSelect();
     renderTimetable();
     renderSummary();
     renderBoard();
     renderTable();
+    renderDegree();
+    renderCourses();
   }
 
   // ---------- Module dialog ----------
@@ -355,6 +692,10 @@
     moduleForm.grade.value = m.grade ?? '';
     moduleForm.lecturer.value = m.lecturer;
     moduleForm.notes.value = m.notes;
+    moduleForm.req.innerHTML = '<option value="">Automatic</option>'
+      + Degree.sections.map((s) => `<optgroup label="${esc(s.title)}">${s.groups.map((g) => `<option value="${g.id}">${esc(g.title)}</option>`).join('')}</optgroup>`).join('')
+      + '<option value="ue">Unrestricted Electives</option>';
+    moduleForm.req.value = m.req || '';
     pickedColor = m.color;
     renderSwatches();
     $('#deleteModuleBtn').hidden = !editingModule;
@@ -374,12 +715,21 @@
       lecturer: f.lecturer.value.trim(),
       notes: f.notes.value.trim(),
       color: pickedColor,
+      req: f.req.value,
     };
     if (editingModule) Object.assign(editingModule, data);
     else state.modules.push({ id: uid(), ...data });
     moduleDialog.close();
     toast(editingModule ? 'Module updated' : 'Module added');
     commit();
+  });
+
+  moduleForm.code.addEventListener('change', () => {
+    const c = catalogMap.get(moduleForm.code.value.trim().toUpperCase());
+    if (!c) return;
+    moduleForm.code.value = c.c;
+    if (!moduleForm.name.value.trim()) moduleForm.name.value = c.t;
+    moduleForm.credits.value = c.u;
   });
 
   $('#swatches').addEventListener('click', (e) => {
@@ -466,7 +816,7 @@
 
   // ---------- Events ----------
 
-  $$('.tab').forEach((b) => b.addEventListener('click', () => setView(b.dataset.view)));
+  $$('.tab').forEach((b) => b.addEventListener('click', () => { setView(b.dataset.view); window.scrollTo(0, 0); }));
 
   $('#themeBtn').addEventListener('click', () => {
     const dark = state.settings.theme === 'dark' || (state.settings.theme === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
@@ -592,6 +942,65 @@
     if (row && e.key === 'Enter') openModule(row.dataset.module);
   });
 
+  // Degree + course search
+  $('#degree').addEventListener('click', (e) => {
+    const t = e.target.closest('[data-show],[data-add],[data-browse],[data-view-link]');
+    if (!t) return;
+    if (t.dataset.add) setCourseStatus(t.dataset.add, 'planned');
+    else if (t.dataset.show) showCourse(t.dataset.show);
+    else if (t.dataset.browse) browseGroup(t.dataset.browse);
+    else setView(t.dataset.viewLink);
+  });
+
+  $('#degree').addEventListener('toggle', (e) => { if (e.target.matches('details.focus')) focusOpen = e.target.open; }, true);
+
+  let searchTimer;
+  $('#cSearch').addEventListener('input', (e) => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => { cf.q = e.target.value; cf.limit = 40; renderCourses(); }, 120);
+  });
+  $('#cShow').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    cf.show = b.dataset.v;
+    cf.limit = 40;
+    syncCourseFilters();
+    renderCourses();
+  });
+  $('#cReq').addEventListener('change', (e) => { cf.req = e.target.value; cf.limit = 40; renderCourses(); });
+  $('#cSubject').addEventListener('change', (e) => { cf.subject = e.target.value; cf.limit = 40; renderCourses(); });
+  $('#cLevel').addEventListener('change', (e) => { const v = +e.target.value; e.target.checked ? cf.levels.add(v) : cf.levels.delete(v); cf.limit = 40; renderCourses(); });
+  $('#cSem').addEventListener('change', (e) => { const v = e.target.value; e.target.checked ? cf.sems.add(v) : cf.sems.delete(v); cf.limit = 40; renderCourses(); });
+  $('#cReset').addEventListener('click', () => {
+    Object.assign(cf, { q: '', show: 'all', req: '', subject: '', limit: 40 });
+    cf.levels.clear();
+    cf.sems.clear();
+    syncCourseFilters();
+    renderCourses();
+  });
+  $('#cFilterToggle').addEventListener('click', (e) => {
+    const open = $('#courseFilters').classList.toggle('expanded');
+    e.currentTarget.setAttribute('aria-expanded', open);
+    e.currentTarget.textContent = open ? 'Fewer filters ▴' : 'More filters ▾';
+  });
+  $('#cMore').addEventListener('click', () => { cf.limit += 60; renderCourses(); });
+  $('#cTerm').addEventListener('change', (e) => { state.settings.addTerm = e.target.value; save(); });
+  $('#cResults').addEventListener('click', (e) => {
+    const card = e.target.closest('.course');
+    if (!card) return;
+    const code = card.dataset.code;
+    const t = e.target.closest('[data-set],[data-toggle],[data-browse]');
+    if (!t) return;
+    if (t.dataset.browse) return browseGroup(t.dataset.browse);
+    if ('toggle' in t.dataset) {
+      cf.open.has(code) ? cf.open.delete(code) : cf.open.add(code);
+      return renderCourses();
+    }
+    const m = myModulesByCode().get(code);
+    // Clicking the active status again removes the course from the plan.
+    setCourseStatus(code, m && m.status === t.dataset.set ? 'remove' : t.dataset.set);
+  });
+
   // ---------- Import / export ----------
 
   $('#exportBtn').addEventListener('click', () => {
@@ -632,6 +1041,8 @@
 
   applyTheme();
   setView(state.settings.view);
+  renderCourseFilters();
   render();
+  loadCatalog();
   setInterval(renderTimetable, 60 * 1000);
 })();

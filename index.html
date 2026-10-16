@@ -6,7 +6,7 @@
   <title>Timetable & Module Planner</title>
   <meta name="description" content="Weekly class timetable and degree module planner. Runs entirely in your browser.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='3' y='5' width='26' height='24' rx='5' fill='%234f6bed'/><rect x='3' y='5' width='26' height='7' rx='3' fill='%23293d9e'/><rect x='8' y='16' width='6' height='4' rx='1' fill='white'/><rect x='17' y='16' width='7' height='9' rx='1' fill='white'/></svg>">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=2">
 </head>
 <body>
   <header class="topbar">
@@ -16,8 +16,10 @@
     </div>
     <nav class="tabs" role="tablist">
       <button class="tab" role="tab" data-view="timetable">Timetable</button>
-      <button class="tab" role="tab" data-view="planner">Module plan</button>
-      <button class="tab" role="tab" data-view="modules">Modules</button>
+      <button class="tab" role="tab" data-view="planner">Plan</button>
+      <button class="tab" role="tab" data-view="degree">Degree</button>
+      <button class="tab" role="tab" data-view="courses">Courses</button>
+      <button class="tab" role="tab" data-view="modules">My modules</button>
     </nav>
     <div class="top-actions">
       <button class="ghost" id="exportBtn" title="Download a backup of your data">Export</button>
@@ -56,6 +58,64 @@
       <div id="board" class="board"></div>
     </section>
 
+    <!-- Degree requirements -->
+    <section class="view" id="view-degree">
+      <div id="degree"></div>
+    </section>
+
+    <!-- NUS course search -->
+    <section class="view" id="view-courses">
+      <div class="courses-layout">
+        <aside class="filters" id="courseFilters">
+          <input type="search" id="cSearch" placeholder="Search code, title, description…" aria-label="Search courses" autocomplete="off">
+          <div class="fgroup">
+            <div class="fhead">Show</div>
+            <div class="pills" id="cShow">
+              <button data-v="all">All</button>
+              <button data-v="degree">For my degree</button>
+              <button data-v="todo">Still needed</button>
+              <button data-v="mine">On my plan</button>
+              <button data-v="completed">Taken</button>
+            </div>
+          </div>
+          <button class="ghost small filter-toggle" id="cFilterToggle" aria-expanded="false">More filters ▾</button>
+          <label class="fgroup extra"><span class="fhead">Requirement</span><select id="cReq"></select></label>
+          <label class="fgroup extra"><span class="fhead">Subject</span><select id="cSubject"></select></label>
+          <div class="fgroup extra">
+            <div class="fhead">Level</div>
+            <div class="checks" id="cLevel">
+              <label><input type="checkbox" value="1000"> 1000</label>
+              <label><input type="checkbox" value="2000"> 2000</label>
+              <label><input type="checkbox" value="3000"> 3000</label>
+              <label><input type="checkbox" value="4000"> 4000</label>
+              <label><input type="checkbox" value="5000"> 5000+</label>
+            </div>
+          </div>
+          <div class="fgroup extra">
+            <div class="fhead">Offered in</div>
+            <div class="checks" id="cSem">
+              <label><input type="checkbox" value="S1"> Sem 1</label>
+              <label><input type="checkbox" value="S2"> Sem 2</label>
+              <label><input type="checkbox" value="ST1"> Special Term I</label>
+              <label><input type="checkbox" value="ST2"> Special Term II</label>
+            </div>
+          </div>
+          <button class="ghost small extra" id="cReset">Reset filters</button>
+        </aside>
+        <div class="results">
+          <div class="results-head">
+            <span id="cCount" class="muted"></span>
+            <span class="spacer"></span>
+            <label class="field-inline small">Add to
+              <select id="cTerm"></select>
+            </label>
+          </div>
+          <div id="cResults"></div>
+          <button class="ghost more" id="cMore" hidden>Show more</button>
+        </div>
+      </div>
+    </section>
+
     <!-- Module list -->
     <section class="view" id="view-modules">
       <div class="toolbar">
@@ -80,7 +140,7 @@
     <form id="moduleForm" method="dialog">
       <h2 id="moduleDialogTitle">Add module</h2>
       <div class="grid2">
-        <label>Code<input name="code" required maxlength="20" placeholder="CS101"></label>
+        <label>Code<input name="code" required maxlength="20" placeholder="CS2030S" list="courseCodes" autocomplete="off"></label>
         <label>Credits<input name="credits" type="number" min="0" step="0.5" value="15"></label>
       </div>
       <label>Name<input name="name" required maxlength="120" placeholder="Introduction to Programming"></label>
@@ -98,6 +158,7 @@
         <label>Lecturer<input name="lecturer" maxlength="80"></label>
         <label>Grade (%)<input name="grade" type="number" min="0" max="100" step="0.1" placeholder="—"></label>
       </div>
+      <label>Counts towards<select name="req"></select></label>
       <fieldset class="colors">
         <legend>Colour</legend>
         <div id="swatches" class="swatches"></div>
@@ -146,9 +207,11 @@
     </form>
   </dialog>
 
+  <datalist id="courseCodes"></datalist>
   <input type="file" id="importFile" accept=".json,application/json" hidden>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-  <script src="app.js"></script>
+  <script src="degree.js?v=2"></script>
+  <script src="app.js?v=2"></script>
 </body>
 </html>
