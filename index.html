@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Timetable & Module Planner</title>
+  <meta name="description" content="Weekly class timetable and degree module planner. Runs entirely in your browser.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='3' y='5' width='26' height='24' rx='5' fill='%234f6bed'/><rect x='3' y='5' width='26' height='7' rx='3' fill='%23293d9e'/><rect x='8' y='16' width='6' height='4' rx='1' fill='white'/><rect x='17' y='16' width='7' height='9' rx='1' fill='white'/></svg>">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true"></span>
+      <span>Planner</span>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button class="tab" role="tab" data-view="timetable">Timetable</button>
+      <button class="tab" role="tab" data-view="planner">Module plan</button>
+      <button class="tab" role="tab" data-view="modules">Modules</button>
+    </nav>
+    <div class="top-actions">
+      <button class="ghost" id="exportBtn" title="Download a backup of your data">Export</button>
+      <button class="ghost" id="importBtn" title="Load data from a backup file">Import</button>
+      <button class="ghost icon" id="themeBtn" title="Toggle light / dark" aria-label="Toggle theme">◐</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Timetable -->
+    <section class="view" id="view-timetable">
+      <div class="toolbar">
+        <label class="field-inline">Term
+          <select id="ttTerm"></select>
+        </label>
+        <label class="check"><input type="checkbox" id="showWeekend"> Weekends</label>
+        <span id="clashBadge" class="badge warn" hidden></span>
+        <span class="spacer"></span>
+        <span class="muted small hint">Click an empty slot to add a class</span>
+        <button class="ghost" id="printBtn">Print</button>
+        <button class="primary" id="addSessionBtn">+ Add class</button>
+      </div>
+      <div class="tt-wrap"><div id="timetable" class="timetable"></div></div>
+      <div id="ttLegend" class="legend"></div>
+    </section>
+
+    <!-- Planner board -->
+    <section class="view" id="view-planner">
+      <div id="summary" class="summary"></div>
+      <div class="toolbar">
+        <span class="muted small">Drag modules between terms to plan your degree.</span>
+        <span class="spacer"></span>
+        <button class="ghost" id="addTermBtn">+ Add term</button>
+        <button class="primary" id="addModuleBtn">+ Add module</button>
+      </div>
+      <div id="board" class="board"></div>
+    </section>
+
+    <!-- Module list -->
+    <section class="view" id="view-modules">
+      <div class="toolbar">
+        <input type="search" id="moduleSearch" placeholder="Search modules…" aria-label="Search modules">
+        <span class="spacer"></span>
+        <button class="ghost danger-text" id="resetBtn">Clear all data</button>
+        <button class="primary" id="addModuleBtn2">+ Add module</button>
+      </div>
+      <div class="table-wrap">
+        <table class="modules">
+          <thead>
+            <tr><th>Code</th><th>Name</th><th>Term</th><th class="num">Credits</th><th>Status</th><th class="num">Grade</th><th class="num">Classes</th></tr>
+          </thead>
+          <tbody id="moduleRows"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- Module dialog -->
+  <dialog id="moduleDialog">
+    <form id="moduleForm" method="dialog">
+      <h2 id="moduleDialogTitle">Add module</h2>
+      <div class="grid2">
+        <label>Code<input name="code" required maxlength="20" placeholder="CS101"></label>
+        <label>Credits<input name="credits" type="number" min="0" step="0.5" value="15"></label>
+      </div>
+      <label>Name<input name="name" required maxlength="120" placeholder="Introduction to Programming"></label>
+      <div class="grid2">
+        <label>Term<select name="term"></select></label>
+        <label>Status
+          <select name="status">
+            <option value="planned">Planned</option>
+            <option value="active">In progress</option>
+            <option value="completed">Completed</option>
+          </select>
+        </label>
+      </div>
+      <div class="grid2">
+        <label>Lecturer<input name="lecturer" maxlength="80"></label>
+        <label>Grade (%)<input name="grade" type="number" min="0" max="100" step="0.1" placeholder="—"></label>
+      </div>
+      <fieldset class="colors">
+        <legend>Colour</legend>
+        <div id="swatches" class="swatches"></div>
+      </fieldset>
+      <label>Notes<textarea name="notes" rows="3" maxlength="2000"></textarea></label>
+      <div class="dialog-actions">
+        <button type="button" class="ghost danger-text" id="deleteModuleBtn">Delete</button>
+        <span class="spacer"></span>
+        <button type="button" class="ghost" data-close>Cancel</button>
+        <button type="submit" class="primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Class/session dialog -->
+  <dialog id="sessionDialog">
+    <form id="sessionForm" method="dialog">
+      <h2 id="sessionDialogTitle">Add class</h2>
+      <label>Module<select name="moduleId" required></select></label>
+      <div class="grid2">
+        <label>Type
+          <select name="type">
+            <option>Lecture</option><option>Tutorial</option><option>Lab</option>
+            <option>Seminar</option><option>Workshop</option><option>Other</option>
+          </select>
+        </label>
+        <label>Day
+          <select name="day">
+            <option value="0">Monday</option><option value="1">Tuesday</option><option value="2">Wednesday</option>
+            <option value="3">Thursday</option><option value="4">Friday</option><option value="5">Saturday</option><option value="6">Sunday</option>
+          </select>
+        </label>
+      </div>
+      <div class="grid2">
+        <label>Start<input name="start" type="time" required step="300" value="09:00"></label>
+        <label>End<input name="end" type="time" required step="300" value="10:00"></label>
+      </div>
+      <label>Location<input name="location" maxlength="80" placeholder="Room 2.14"></label>
+      <p class="error" id="sessionError" hidden></p>
+      <div class="dialog-actions">
+        <button type="button" class="ghost danger-text" id="deleteSessionBtn">Delete</button>
+        <span class="spacer"></span>
+        <button type="button" class="ghost" data-close>Cancel</button>
+        <button type="submit" class="primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <input type="file" id="importFile" accept=".json,application/json" hidden>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
